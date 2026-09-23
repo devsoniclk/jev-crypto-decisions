@@ -1,0 +1,45 @@
+# Jev Crypto Decisions Configuration
+
+jev:
+  # Which provider to use: typesafe | openrouter
+  provider: openrouter
+  model: typesafe/jev-1.13
+  timeout_s: 30
+
+scanner:
+  # Assets to monitor
+  assets:
+    - BTC
+    - ETH
+    - SOL
+    - XRP
+  # Data source: coingecko | binance
+  source: coingecko
+  # Scan interval in seconds
+  interval_s: 300
+
+signal:
+  # Minimum Jev confidence to act
+  min_confidence: 0.70
+  # Minimum edge (p_jev - market_implied) to trigger
+  min_edge: 0.08
+  # Maximum positions at once
+  max_positions: 5
+
+risk:
+  # Max USD per trade
+  max_usd_per_trade: 50
+  # Max total exposure
+  max_exposure_usd: 250
+  # Kelly fraction (0-1)
+  kelly_fraction: 0.25
+  # Daily stop loss USD
+  daily_stop_loss: 50
+  # Emergency kill switch file
+  kill_switch_file: data/KILL
+
+logging:
+  # Decision log file
+  decisions_log: data/decisions.jsonl
+  # Enable Telegram alerts
+  telegram: false
