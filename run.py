@@ -130,6 +130,8 @@ def cmd_decide(cfg):
         risk_lvl = sig["risk_level"]
         genuine = sig["genuine_demand_prob"]
         higher = sig["higher_24h_prob"]
+        overbought = sig["overbought_prob"]
+        pullback = sig["pullback_prob"]
         trade = "YES" if risk_check["approved"] else "NO"
 
         # Color-coded action
@@ -146,6 +148,7 @@ def cmd_decide(cfg):
         print(f"    Regime:    {regime}")
         print(f"    Risk:      {risk_lvl:.1%}")
         print(f"    Genuine:   {genuine:.1%}  |  24h outlook: {higher:.1%}")
+        print(f"    Overbought:{overbought:.1%}  |  Pullback:    {pullback:.1%}")
         print(f"    Trade?     {trade}  |  Size: ${risk_check['size_usd']:.2f}")
         if not risk_check["approved"]:
             print(f"    Reason:    {risk_check['reason']}")

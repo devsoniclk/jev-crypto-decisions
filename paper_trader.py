@@ -153,7 +153,8 @@ class PaperTrader:
                 "balance": self.balance,
                 "return_pct": 0,
                 "open_positions": len(self.positions),
-                "max_drawdown": 0,
+                "max_drawdown_pct": 0,
+                "avg_hold_seconds": 0,
             }
 
         wins = [t for t in self.trades if t["pnl"] > 0]

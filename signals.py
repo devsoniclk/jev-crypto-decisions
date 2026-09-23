@@ -57,6 +57,14 @@ class SignalClassifier:
                 "type": "noul",
                 "instructions": f"There is a high probability that {asset} will be higher in 24 hours than it is now.",
             },
+            {
+                "type": "noul",
+                "instructions": f"The market for {asset} is overbought — prices have risen too far too fast and are likely to correct.",
+            },
+            {
+                "type": "noul",
+                "instructions": f"A price pullback for {asset} is likely within the next 4 hours.",
+            },
         ]
 
         try:
@@ -70,6 +78,8 @@ class SignalClassifier:
         risk = answers[2] if len(answers) > 2 else {}
         genuine = answers[3] if len(answers) > 3 else {}
         higher_24h = answers[4] if len(answers) > 4 else {}
+        overbought = answers[5] if len(answers) > 5 else {}
+        pullback = answers[6] if len(answers) > 6 else {}
 
         regime_str = regime.get("choice", "unknown")
         regime_conf = regime.get("confidence", 0.0)
@@ -78,17 +88,33 @@ class SignalClassifier:
         risk_score = risk.get("score", 2.0) / 4.0  # normalize to 0-1
         genuine_prob = genuine.get("noul", 0.5)
         higher_prob = higher_24h.get("noul", 0.5)
+        overbought_prob = overbought.get("noul", 0.5)
+        pullback_prob = pullback.get("noul", 0.5)
 
         # Decision logic
         should_trade = (
             action_conf >= self.min_confidence
-            and genuine_prob >= 0.6
+            and genuine_prob >= 0.4
             and risk_score < 0.7
             and action_str in ("strong-buy", "buy", "sell", "strong-sell")
         )
 
         # For buys, need positive 24h outlook
-        if action_str in ("buy", "strong-buy") and higher_prob < 0.55:
+        if action_str in ("buy", "strong-buy") and higher_prob < 0.45:
+            should_trade = False
+
+        # Overbought dampens buys, encourages sells
+        if overbought_prob >= 0.7:
+            if action_str in ("buy", "strong-buy"):
+                should_trade = False  # Don't buy into overbought conditions
+            elif action_str in ("sell", "strong-sell"):
+                should_trade = (
+                    action_conf >= self.min_confidence
+                    and risk_score < 0.7
+                )  # Sell signals override genuine_demand when overbought
+
+        # High pullback probability dampens buys
+        if pullback_prob >= 0.7 and action_str in ("buy", "strong-buy"):
             should_trade = False
 
         result = {
@@ -100,6 +126,8 @@ class SignalClassifier:
             "risk_level": round(risk_score, 3),
             "genuine_demand_prob": round(genuine_prob, 3),
             "higher_24h_prob": round(higher_prob, 3),
+            "overbought_prob": round(overbought_prob, 3),
+            "pullback_prob": round(pullback_prob, 3),
             "should_trade": should_trade,
             "timestamp": time.time(),
             "raw_answers": answers,
@@ -117,6 +145,8 @@ class SignalClassifier:
             "risk_level": 1.0,
             "genuine_demand_prob": 0.0,
             "higher_24h_prob": 0.0,
+            "overbought_prob": 0.0,
+            "pullback_prob": 0.0,
             "should_trade": False,
             "error": error,
             "timestamp": time.time(),
@@ -148,7 +178,7 @@ class RiskManager:
             "signal_should_trade": signal.get("should_trade", False),
             "confidence_ok": signal.get("action_confidence", 0) >= 0.7,
             "risk_ok": signal.get("risk_level", 1.0) < 0.7,
-            "genuine_ok": signal.get("genuine_demand_prob", 0) >= 0.6,
+            "genuine_ok": signal.get("genuine_demand_prob", 0) >= 0.4,
             "exposure_ok": self.total_exposure < self.max_exposure_usd,
             "daily_loss_ok": self.daily_pnl > -self.daily_stop_loss,
             "not_duplicate": signal["asset"] not in [p["asset"] for p in self.open_positions],
