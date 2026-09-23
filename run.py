@@ -113,6 +113,10 @@ def cmd_decide(cfg):
     print(f"  JEV DECISIONS  |  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 70)
 
+    # Print trade plan table
+    print(f"\n  {'ASSET':<6} {'ACTION':<12} {'ENTRY':>12} {'SL':>12} {'TP':>12} {'R:R':>6} {'SIZE':>8}")
+    print("  " + "-" * 74)
+
     for d in data:
         state = scanner.get_state_string(d)
         sig = classifier.classify(state, d["symbol"])
@@ -120,38 +124,34 @@ def cmd_decide(cfg):
         # Log it
         log.log({**sig, "price_at_decision": d["price"], "market_data": d})
 
-        # Risk check
+        # Risk check & trade plan
         risk_check = risk.check_trade(sig, d["price"])
+        plan = risk.calculate_trade_plan(sig, d["price"])
 
-        # Display
         action = sig["action"].upper()
-        conf = sig["action_confidence"]
-        regime = sig["regime"]
-        risk_lvl = sig["risk_level"]
-        genuine = sig["genuine_demand_prob"]
-        higher = sig["higher_24h_prob"]
-        overbought = sig["overbought_prob"]
-        pullback = sig["pullback_prob"]
-        trade = "YES" if risk_check["approved"] else "NO"
 
-        # Color-coded action
-        action_display = action
         if action in ("STRONG-BUY", "BUY"):
-            action_display = f"[BUY]  {action}"
+            action_tag = "BUY"
         elif action in ("STRONG-SELL", "SELL"):
-            action_display = f"[SELL] {action}"
+            action_tag = "SELL"
         else:
-            action_display = f"[---]  {action}"
+            action_tag = "HOLD"
 
-        print(f"\n  {d['symbol']} @ ${d['price']:,.2f}")
-        print(f"    Action:    {action_display}  (conf: {conf:.1%})")
-        print(f"    Regime:    {regime}")
-        print(f"    Risk:      {risk_lvl:.1%}")
-        print(f"    Genuine:   {genuine:.1%}  |  24h outlook: {higher:.1%}")
-        print(f"    Overbought:{overbought:.1%}  |  Pullback:    {pullback:.1%}")
-        print(f"    Trade?     {trade}  |  Size: ${risk_check['size_usd']:.2f}")
-        if not risk_check["approved"]:
-            print(f"    Reason:    {risk_check['reason']}")
+        action_display = f"{action_tag} ({sig['action_confidence']:.0%})"
+        entry_str = f"${plan['entry']:,.2f}" if plan['entry'] else "-"
+        sl_str = f"${plan['sl']:,.2f}" if plan['sl'] != plan['entry'] else "-"
+        tp_str = f"${plan['tp']:,.2f}" if plan['tp'] != plan['entry'] else "-"
+        rr_str = f"{plan['risk_reward']:.1f}" if plan['risk_reward'] > 0 else "-"
+        size_str = f"${plan['position_size_usd']:.0f}" if plan['position_size_usd'] > 0 else "-"
+
+        print(
+            f"  {d['symbol']:<6} {action_display:<12} "
+            f"{entry_str:>12} {sl_str:>12} {tp_str:>12} {rr_str:>6} {size_str:>8}"
+        )
+
+        # Show rejection reason for non-hold rejected trades
+        if not risk_check["approved"] and action_tag != "HOLD":
+            print(f"         -> {risk_check['reason']}")
 
     print(f"\n  Jev Stats: {jev.stats()['total_calls']} calls, ${jev.stats()['total_cost_usd']:.6f}")
     print()

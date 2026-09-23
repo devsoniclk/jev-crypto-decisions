@@ -233,3 +233,53 @@ class RiskManager:
 
     def reset_daily(self):
         self.daily_pnl = 0.0
+
+    def calculate_trade_plan(self, signal: dict, current_price: float) -> dict:
+        """
+        Calculate concrete entry/SL/TP prices and position size for spot trading.
+
+        Returns dict with: entry, sl, tp, risk_reward, position_size_usd
+        """
+        action = signal.get("action", "hold")
+        risk_level = signal.get("risk_level", 0.5)
+        conf = signal.get("action_confidence", 0.0)
+        prob = signal.get("higher_24h_prob", 0.5)
+
+        entry = current_price
+        sl = entry
+        tp = entry
+        rr = 0.0
+        size_usd = 0.0
+
+        if action in ("buy", "strong-buy"):
+            sl = entry * (1 - risk_level * 0.05)
+            tp = entry * (1 + risk_level * 0.10)
+            risk_dist = entry - sl
+            reward_dist = tp - entry
+            rr = reward_dist / risk_dist if risk_dist > 0 else 0.0
+            kelly = self._kelly(prob, rr if rr > 0 else 2.0)
+            size_usd = min(
+                self.max_usd_per_trade,
+                self.max_exposure_usd - self.total_exposure,
+                max(5, kelly * 100),
+            )
+        elif action in ("sell", "strong-sell"):
+            sl = entry * (1 + risk_level * 0.05)
+            tp = entry * (1 - risk_level * 0.10)
+            risk_dist = sl - entry
+            reward_dist = entry - tp
+            rr = reward_dist / risk_dist if risk_dist > 0 else 0.0
+            kelly = self._kelly(1 - prob, rr if rr > 0 else 2.0)
+            size_usd = min(
+                self.max_usd_per_trade,
+                self.max_exposure_usd - self.total_exposure,
+                max(5, kelly * 100),
+            )
+
+        return {
+            "entry": round(entry, 2),
+            "sl": round(sl, 2),
+            "tp": round(tp, 2),
+            "risk_reward": round(rr, 2),
+            "position_size_usd": round(size_usd, 2),
+        }
